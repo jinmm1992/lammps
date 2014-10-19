@@ -1,0 +1,10 @@
+# Settings for libraries used by specific LAMMPS packages
+# this file is auto-edited when those packages are included/excluded
+
+PKG_INC =   -I../../lib/reax -I../../lib/poems -DLMP_MPIIO -I../../lib/meam -DLMP_KOKKOS -I../../src -I../../src 
+PKG_PATH =  -L../../lib/reax -L../../lib/poems -L../../lib/meam 
+PKG_LIB =   -lreax -lpoems -lmeam -lkokkoscore 
+
+PKG_SYSINC =  $(voronoi_SYSINC) $(reax_SYSINC) $(meam_SYSINC) $(KOKKOS_INC) 
+PKG_SYSLIB =  $(voronoi_SYSLIB) $(reax_SYSLIB) $(meam_SYSLIB) $(KOKKOS_LINK) 
+PKG_SYSPATH = $(voronoi_SYSPATH) $(reax_SYSPATH) $(meam_SYSPATH) 

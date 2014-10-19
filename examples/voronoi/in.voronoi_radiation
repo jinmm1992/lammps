@@ -1,0 +1,61 @@
+# This simulation is to get the scene of radiation damage cascade
+
+# ----------------------------INITIALIZATION-------------------------
+clear
+dimension      3
+boundary       p p p
+units          metal
+atom_style     atomic
+atom_modify    sort 0 0.0 map hash 
+
+# ----------------------------GEOMETRY DEFINITION-------------------------
+
+lattice        custom 3.232 a1 1.0 0.0 0.0 a2 0.0 1.7321 0.0 a3 0.0 0.0 1.5925 &
+               basis 0.0 0.0 0.0 basis 0.5 0.5 0.0 basis 0.5 0.8333 0.5 basis 0.0 0.3333 0.5
+
+region         box block -10 10 -10 10 -10 10
+create_box     1 box
+create_atoms   1 box
+group          allZr region box
+mass           1   91.224
+
+# ----------------------------POTENTIAL FIELD-------------------------
+pair_style     eam/fs
+pair_coeff     * *  Zr_2.eam.fs Zr
+
+# ----------------------------SETTINGS-------------------------
+compute        csym all centro/atom 12
+compute        iv all voronoi/atom occupation
+compute        eng all pe/atom
+compute        temp all temp
+
+# ----------------------------MINIMIZATION-------------------------
+reset_timestep 0
+thermo         100
+thermo_style   custom step pe lx ly lz press pxx pyy pzz c_temp
+min_style      cg
+minimize       1e-15 1e-15 10000 10000
+run            0
+
+# ----------------------------RELAX------------------------- 
+velocity       allZr create 600 4928459 mom yes rot yes dist uniform
+fix            1 all nvt temp 600 600 1.0 drag 0.2
+thermo         200
+timestep       0.001 #1fs
+dump           1 all custom 1000 dump.relax.* id type xs ys zs c_csym c_eng
+#dump     2     all  movie   500   movie.mpg    element  element  axes yes   0.8 0.02   view 60 -30  
+dump           3 all custom 10000 iv.txt c_iv[1] c_iv[2]
+run            30000
+undump         1
+unfix          1
+
+# ----------------------------PKA DEFINITION-------------------------
+region        pka sphere 0 0 0 1.5894 units box
+group         pka region pka
+velocity      pka  set  4.37 NULL NULL units box #corresponding to 1kev
+fix           2 all nve
+timestep      0.001 #1fs
+  
+dump          4 all xyz 10000 dump1.xyz
+dump          5 all custom 1000 iv1.txt c_iv[1] c_iv[2]
+run           30000

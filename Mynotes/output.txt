@@ -1,0 +1,135 @@
+关于LAMMPS输出【Output】的问题 zz (2012-05-23 10:58:32)转载▼
+标签： 杂谈	
+谈谈关于LAMMPS输出【Output】的问题
+2009-09-25 19:40
+无论任何模拟，我们都是想从模拟中得到我们想要的数据【data】，然后分析这些数据，从而提取出相关的信息【MAYBE新的发现】，那么数据的输出是
+必然的一道程序，下面谈谈LAMMPS软件是如何输出data。
+LAMMPS中处理的输出数据主要分一下三个大的部分：
+1.断点数据，这个主要是为了防止模拟过程中出现意外，比如实验室或机房突然断电，程序部分阶段有错误等等。
+2.系统热力学量的输出，这些量一般是体系中各个原子的集体行为量，比如温度，压强等
+3.单原子详细信息的输出，如我们想得到的轨迹文件
+
+对应于上面的三大部分，LAMMPS设置了不同的命令，有些命令结合在一起实现相关的功能。
+
+1.对于断点数据，原始数据，LAMMPS主要有一下命令进行数据的输入输出。read_data，read_restart【读入】，
+restart，write_restart【输出】，如果能灵活运用这几个命令，会让你的模拟在突发事件下得到经济上的收获。其中命令里有两类通配
+符，* 表示时间步，% 表示CPU编号。
+
+2.全局热力学数据，也就是所谓的thermodynamic output，这些量是面向于系统的，而不是面向于某一类，某一组，原子的。一般是系统
+宏观信息的数据。处理这些数据的命令主要有如下几个 thermo, thermo_modify, thermo_style[这个命令对于初学者要
+认真研究和调试]，还有相关的把单原子信息转换为【global quantities】的辅助命令：fix ave/time，fix ave/
+spatial， compute reduce 这些命令可以自己设定输出的频率，文件名等等。thermo_style 和 compute/
+fix/variable命令结合进行数据的处理和输出是个大学问，这个需要不断的调试才能熟练掌握。其实研究variable compute和少数
+关于数据处理的fix可以节约你大量后期数据处理的时间。
+
+3.单原子数据。相关命令主要有dump, dump_modify,undump.时刻牢记这些命令用于处理atom的数据对于你出现的错误就有敏感
+性了，呵呵。
+
+4。echo,print,fix print结合variable可以用于调试你的脚本，纠错。
+
+5.秀个例子，用于输出setforce， group原子于其他相互作用力
+
+#------------------------------------------------------------------------------------
+fix                   3   tetras setforce 0.0 0.0 0.0
+variable             fx   equal f_3[1]
+variable             fy   equal f_3[2]
+variable             fz   equal f_3[3]
+fix                   4 tetras print 1 "-- ${fx}   ${fy}   ${fz} --"
+#------------------------------------------------------------------------------------
+thermo                 2
+thermo_style         custom step f_3[1]   f_3[1]   f_3[1]
+#------------------------------------------------------------------------------------
+
+
+以上由redream/一下是fc所写
+
+
+
+关于output，手册4.15，曾粗略翻译过
+
+除了restart文件，LAMMPS还有两种基本的输出。第一种是热力学输出，每隔一定的时间步就打印到屏幕和log文件的一列数。第二种是dump
+文件，包括按照一定的频率写入文件的原子位置快照和各种per-atom数值。每个模拟打印一组热力学输出；可能生成任意数目的dump文件。如下所讨
+论的，LAMMPS为你提供多种方式来决定当热力学信息和dump文件输出的时候，哪些量是需要计算和打印的。有3个fix命令可以按照用户选择的量执
+行它们自己的输出：fix ave/time用来做时间平均，fix ave/spatial用来做空间平均，以及fix print。下面会详述。贯
+穿这个讨论，用户要注意他们可以添加自己的compute命令和fix命令，通过这些命令定义自己的输出。
+
+Thermodynamic output 热力学输出的频率和格式是由thermo、thermo_style、thermo_modify命令设置
+的。thermo_style命令也指定了哪些数值需要被计算输出。可以指定预先定义的变量（例如press、etotal等等）。还可以指定三类
+keyword（c_ID、f_ID、 v_name），分别由compute、fix、variable命令提供相应的数据。以下依次讲述。
+
+在LAMMPS中，有两种类型的compute命令：一种计算global value（例如温度，压强张量）另一种计算per-atom
+values。只有前者可以作为热力学输出。用户指定的compute命令的ID加上一个可选的下标作为thermo_style命令的一部分。例如
+c_myTemp 输出由该compute得到的标量值；c_myTemp[2]输出第2个矢量分量。注意compute reduce可以对per-
+atom的量加和得到global标量和矢量。
+
+fix命令可以生成由热力学输出的global scalar或vector，例如压头（indenter）与原子之间的相互作用能。这些数值可以通过
+与前述compute命令同样的格式，如f_ID、 f_ID[N]。至于哪个fix计算可通过热力学信息输出的global values请参阅见各
+个fix的手册。
+fix ave/time生成的时间平均的全局量可由热力学输出，例如按时间平均的压强。
+可以在in文件中定义变量，除了atom style的变量之外，其它所有的变量都可以通过热力学信息输出，因为atom style的变量生成对应每
+个原子的值。thermo_style通过v_abc的形式调用名为abc的变量。
+跟equal style变量有关的公式，可以包含数学操作符、函数（例如x+y,x*y,(),sqrt,exp）、原子属性（例如x[N],fx
+[N]）、 group函数（例如mass(),vcm()）、热力学量（如temp,press,vol）、compute命令得到的全局量、fix
+命令得到的全局量、以及其它variable命令的相关变量。因此equal-style变量是定义由热力学信息计算和输出的变量的最普遍的方式。
+
+Dump file output
+dump文件输出由dump命令和dump_modify命令指定。有很多预先定义的格式，如dump atom、dump xtc等等。同样，有一种
+用户指定输出各个原子的哪些属性的dump custom格式。可以指定预定义的keyword（如tag、x、fx）也可以指定另外三种
+keyword（即c_ID、f_ID、v_name，分别由compute、fix、variable命令提供相应数值）。以下依次讲述。
+
+compute命令生成一个或多个可被dump custom共享的per-atom values。这些compute命令的style中含有
+atom字样，例如ke/atom、stress/atom等等。对于标量的per-atom value来说，可以使用c_myKE调用；对于矢量的
+per-atom value的某个分量，可以使用c_myStress[2]调用。
+
+fix命令生成可输出到dump文件的per-atom values。例如，fix ave/atom命令计算每个原子属性值的时间平均，就像那些
+per-atom compute命令以及atom-style variable。这些per-atom fix value可以被dump
+custom命令通过跟上述处理compute命令同样的方式共享，例如f_myKE或者f_myStress[2]。
+
+variable命令可以在in文件中使用。只有atom-style变量可用于dump custom输出，因为只有它们生成per-atom
+value。dump custom命令通过v_abc的形式引用名为abc的变量。
+
+就像equal style变量类似，跟atom-style变量有关的公式，也可以包含数学操作符、函数（例如x+y、x*y、()、sqrt、
+exp）、原子属性值（例如x[N]、fx[N]）、group函数（例如mass()、vcm()）、热力学量（如temp、press、vol）、
+compute命令得到的全局量、fix命令得到的全局量、以及其它生成全局量的非 atom-style变量。另外，atom-style变量可以引
+用原子属性值向量（如x[]、fx[]等）、生成per-atom值的compute、生成per-atom值的fix，以及其它atom-style
+变量。因此atom-style变量是定义由dump文件计算和输出的变量的最普遍的方式。
+
+Fix output 三个用于输出的fix命令需要额外注意：fix ave/time、fix ave/spatial、fix print。
+
+fix ave/time命令能够对任何全局量进行时间平均，例如那些输出的热力学信息。由用户指定一个或多个需要进行时间平均的物理量，可以是
+compute命令得到的全局量、fix命令得到的全局量，或者非atom-style变量。因为变量可以涉及thermo_style custom
+命令使用的keyword（例如temp或press），那么任何热力学量都可以按这种方法进行时间平均。
+fix ave/time命令提供了控制如何进行时间积分的几个选项。它生成的结果可以按照如下两种方法使用。第一，可将结果直接写入一个文件，每个时
+间步的值占一行。注意可以调节平均参数使得根本不做平均，而只是作为把期望的物理量直接输出到指定的文件的便捷方式。
+就像其它生成全局量的fix一样，该fix的结果也可以作为其它任何可以共享全局量的命令的输入，例如thermo_style custom命令，或
+者variable命令。
+
+fix ave/spatial命令可以对per-atom量进行空间平均，类似dump文件输出，只不过后者相当于仅把simulation box
+分为一层。per-atom量可以是密度（质量密度或数密度）或者原子的属性例如位置、速度、力，也可以使compute、fix、atom-
+style variable计算的per-atom值。
+fix ave/spatial命令提供了控制如何进行空间平均的几个选项。它得到的per-layer值可以按照如下两种方式使用。第一，直接将其写
+入文件。注意可以调节平均参数使得根本不做空间平均，而只是作为把期望的物理量（1d layer内所有原子的相应值的求和）直接输出得到指定文件的便
+捷方式。就像其它生成全局量的fix一样，该fix的结果也可以作为其它任何可以共享全局量的命令的输入，例如thermo_style custom
+命令，或者variable命令。至于如何引用这些值，请参阅fix ave/spatial命令的手册说明。
+
+fix print命令在模拟的过程中，定时性的生成写入屏幕和log文件或指定文件的一行输出。该行输出可以包括一个或多个变量值（非atom-
+style变量），如前面已经解释过的，变量本身可以包括引用thermo_style命令的keyword、compute、fix或其它
+variable命令生成的全局量。因此fix print命令是区别于正常的热力学信息输出或者dump文件输出，而输出任何期望得到计算的物理量的
+方法。
+
+以下这个表格概况了各种输出方法相关的命令，详述了它们的输入输出分别是什么，同样列出了调用它们完成输出的频率。一般来说，只要两个命令的输入输出相
+匹配，那么这两个命令就可以承接使用。匹配是指输入输出频率以及global还是per-atom属性完全一致。
+
+表格楼主已给出，不再重复
+秀个例子，用于输出setforce， group原子于其他相互作用力
+
+#------------------------------------------------------------------------------------
+fix                   3   tetras setforce 0.0 0.0 0.0
+variable             fx   equal f_3[1]
+variable             fy   equal f_3[2]
+variable             fz   equal f_3[3]
+fix                   4 tetras print 1 "-- ${fx}   ${fy}   ${fz} --"
+#------------------------------------------------------------------------------------
+thermo                 2
+thermo_style         custom step f_3[1]   f_3[1]   f_3[1]
+#------------------------------------------------------------------------------------ |xGv00|fcc8d4de8197f69fde70263fb4d52380
